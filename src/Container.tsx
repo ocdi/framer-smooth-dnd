@@ -4,6 +4,7 @@ import { Position } from "./Common";
 import { findIndex } from "./find-index";
 import move from "array-move";
 import { AnimateSharedLayout } from "framer-motion";
+import { useSharedDragContext } from "./SharedDragContainer";
 
 // Prevent rapid reverse swapping
 // const buffer = 5;
@@ -41,6 +42,7 @@ import { AnimateSharedLayout } from "framer-motion";
 
 interface IContainerProps {
   orientation?: "vertical" | "horizontal";
+  containerId: string;
   onReorderItems?: (keys: string[]) => void;
 }
 
@@ -64,39 +66,24 @@ const applyDrag = (arr: any, dragResult: any) => {
 };
 */
 
-export const debounce = (fn: Function, delay: number, immediate?: boolean) => {
-  let timer: any = null;
-  return (...params: any[]) => {
-    if (timer) {
-      clearTimeout(timer);
-    }
-    if (immediate && !timer) {
-      fn.call(null, ...params);
-    } else {
-      timer = setTimeout(() => {
-        timer = null;
-        fn.call(null, ...params);
-      }, delay);
-    }
-  };
-};
-
 export const Container: React.FC<IContainerProps> = ({
   orientation,
   onReorderItems,
+  containerId,
   children
 }) => {
+  const { draggingItem } = useSharedDragContext();
+
   const positions = React.useRef<Position[]>([]).current;
   const setPosition = (i: number, offset: Position) => (positions[i] = offset);
 
-  //const [draggedTargetIndex, setDraggedTargetIndex] = React.useState(undefined);
-  //const [draggedIndex, setDraggedIndex] = React.useState(undefined);
   const [indexes, setIndexes] = React.useState(
     React.Children.toArray(children)
   );
-  React.useEffect(() => setIndexes(React.Children.toArray(children)), [
-    children
-  ]);
+  React.useEffect(() => {
+    setIndexes(React.Children.toArray(children));
+    console.log("children changed");
+  }, [children]);
   // todo add a useEffect if children change
 
   const lastOffset = React.useRef<number>();
@@ -116,7 +103,37 @@ export const Container: React.FC<IContainerProps> = ({
     }
   };
 
+  function dragStartItem(item) {
+    console.log("drag start, item", item, containerId);
+
+    let stolen = false;
+
+    function steal() {
+      if (stolen) {
+        console.log("already stolen");
+        return;
+      }
+
+      stolen = true;
+      const index = indexes.indexOf(item);
+      console.log("item being stolen", containerId, index);
+      if (index >= 0) {
+        indexes.splice(index, 1);
+        setIndexes(indexes);
+        positions.splice(index, 1);
+      }
+    }
+
+    draggingItem.current = { item, containerId, steal };
+  }
+
+  function dragStart(index: number) {
+    const item = indexes[index];
+    dragStartItem(item);
+  }
+
   function dragEnd() {
+    draggingItem.current = undefined;
     const orderedKeys = React.Children.map(indexes, (child, index) => {
       if (React.isValidElement(child)) {
         return child.props.itemId;
@@ -125,35 +142,62 @@ export const Container: React.FC<IContainerProps> = ({
     }).filter(Boolean);
     console.log(orderedKeys);
 
-    onReorderItems?.(orderedKeys);
+    // onReorderItems?.(orderedKeys);
   }
 
+  function mouseOver() {
+    if (
+      draggingItem.current &&
+      draggingItem.current.containerId !== containerId
+    ) {
+      console.log(
+        "we have an item from column ",
+        draggingItem.current.containerId,
+        "and we are",
+        containerId
+      );
+      draggingItem.current.steal();
+
+      const item = draggingItem.current.item;
+      const newIndexes = [...indexes, item];
+      dragStartItem(item);
+      setIndexes(newIndexes);
+    } else {
+      console.log("we are not dragging", containerId);
+    }
+  }
+
+  console.log("rendering", containerId, indexes);
   return (
-    <AnimateSharedLayout>
-      <div
-        style={{
-          display: "flex",
-          flexDirection: orientation === "horizontal" ? "row" : "column"
-        }}
-      >
-        {JSON.stringify(positions)}
-        {React.Children.map(indexes, (child, index) => {
-          /*if (index === draggedIndex) {
+    <div
+      style={{
+        display: "flex",
+        minWidth: "300px",
+        background: "green",
+        padding: 10,
+        borderRadius: 5,
+        flexDirection: orientation === "horizontal" ? "row" : "column"
+      }}
+      onMouseEnter={mouseOver}
+    >
+      {JSON.stringify(positions)}
+      {React.Children.map(indexes, (child, index) => {
+        /*if (index === draggedIndex) {
           return <></>;
         }*/
-          if (React.isValidElement(child)) {
-            //child.type ==
-            return React.cloneElement(child, {
-              moveItem: moveItem,
-              dragIndex: index,
-              dragEnd,
-              setPosition
-            });
-          }
+        if (React.isValidElement(child)) {
+          //child.type ==
+          return React.cloneElement(child, {
+            moveItem: moveItem,
+            dragIndex: index,
+            dragEnd,
+            dragStart,
+            setPosition
+          });
+        }
 
-          return child;
-        })}
-      </div>
-    </AnimateSharedLayout>
+        return child;
+      })}
+    </div>
   );
 };
