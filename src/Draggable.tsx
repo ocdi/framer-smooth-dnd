@@ -8,6 +8,7 @@ export interface IDraggableProps {
   moveItem?: (i: number, dragOffset: number) => void;
   dragIndex?: number;
   setPosition?: (dragIndex: number, pos: Position) => void;
+  dragStart?: (index: number) => void;
   dragEnd?: () => void;
 }
 
@@ -78,6 +79,7 @@ export const Draggable = (props: IDraggableProps) => {
       }}
       animate={dragging ? onTop : flat}
       onDragStart={(a, { point }) => {
+        props.dragStart?.(dragIndex);
         dispatch({ type: "START", offset: point.y });
       }}
       onDragEnd={() => {
