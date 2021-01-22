@@ -14,8 +14,7 @@ export const findIndex = (
   positions: Position[]
 ) => {
   let target = i;
-  const { top, height } = positions[i];
-  const bottom = top + height;
+  const { top } = positions[i];
 
   // If moving down
   if (yOffset > 0) {
@@ -24,7 +23,7 @@ export const findIndex = (
 
     const swapOffset =
       distance(top, nextItem.top + nextItem.height / 2) + buffer;
-    console.log("swap offset", swapOffset);
+
     if (yOffset > swapOffset) target = i + 1;
 
     // If moving up
@@ -32,8 +31,8 @@ export const findIndex = (
     const prevItem = positions[i - 1];
     if (prevItem === undefined) return i;
 
-    const prevBottom = prevItem.top;
-    const swapOffset = distance(top, prevBottom - prevItem.height / 2) + buffer;
+    const swapOffset =
+      distance(top, prevItem.top - prevItem.height / 2) + buffer;
     if (yOffset < -swapOffset) target = i - 1;
   }
 
